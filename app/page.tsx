@@ -1,13 +1,8 @@
 /**
- * Main Page - Jarvis Shopping Assistant
+ * Main Page - Kaldi Shopping
  * 
- * This is the main application page that integrates all components:
- * - Voice Assistant for voice control
- * - Product Display with navigation
- * - Shopping Cart
- * - Category Filter
- * 
- * Handles all event listeners for voice-to-UI communication.
+ * Split-screen with voice AI and product marketplace
+ * Features: Language switching, category filtering, swipeable product details
  */
 
 'use client';
@@ -15,48 +10,94 @@
 import { useEffect, useState } from 'react';
 import { useProducts } from '@/lib/useProducts';
 import { useCart } from '@/lib/useCart';
+import { useLanguage } from '@/lib/languageContext';
 import VoiceAssistant from './components/VoiceAssistant';
-import ProductCard from './components/ProductCard';
-import CategoryFilter from './components/CategoryFilter';
+import ProductGrid from './components/ProductGrid';
+import ProductDetail from './components/ProductDetail';
+import CategoryTabs from './components/CategoryTabs';
+import LanguageSwitcher from './components/LanguageSwitcher';
 import { CLIENT_TOOL_EVENTS } from '@/lib/clientTools';
-import { ChevronLeft, ChevronRight, ShoppingCart, Trash2 } from 'lucide-react';
+import { Product, ProductCategory } from '@/lib/types';
+import { ShoppingCart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 export default function Home() {
-  // Product state management
+  const { t } = useLanguage();
+  
+  // Product state
   const {
-    products,
     filteredProducts,
-    currentProduct,
-    currentProductIndex,
+    activeCategory,
     isLoading,
     error,
-    activeCategory,
     setCategory,
     nextProduct,
     previousProduct,
   } = useProducts();
 
-  // Cart state management
+  // Cart state
   const {
     cart,
     itemCount,
     addToCart,
     removeFromCart,
     clearCart,
-  } = useCart(products);
+  } = useCart();
 
+  // UI state
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showCart, setShowCart] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   /**
-   * Listen for cart update events from voice commands
+   * Voice command event listeners
    */
   useEffect(() => {
+    const handleProductNavigate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ direction: 'next' | 'previous' }>;
+      const { direction } = customEvent.detail;
+      
+      if (direction === 'next') {
+        if (selectedProduct) {
+          const currentIndex = filteredProducts.findIndex(p => p.id === selectedProduct.id);
+          if (currentIndex < filteredProducts.length - 1) {
+            setSelectedProduct(filteredProducts[currentIndex + 1]);
+          }
+        } else {
+          nextProduct();
+        }
+      } else {
+        if (selectedProduct) {
+          const currentIndex = filteredProducts.findIndex(p => p.id === selectedProduct.id);
+          if (currentIndex > 0) {
+            setSelectedProduct(filteredProducts[currentIndex - 1]);
+          }
+        } else {
+          previousProduct();
+        }
+      }
+    };
+
+    const handleCategoryFilter = (event: Event) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const customEvent = event as CustomEvent<{ category: any }>;
+      const { category } = customEvent.detail;
+      setCategory(category as ProductCategory | 'all');
+      setSelectedProduct(null);
+      setHasInteracted(true); // Mark as interacted when filtering
+    };
+
     const handleCartUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
+      const customEvent = event as CustomEvent<{
+        action: 'add' | 'remove' | 'clear';
+        productId?: number;
+        quantity?: number;
+      }>;
       const { action, productId, quantity } = customEvent.detail;
 
-      if (action === 'add' && currentProduct) {
-        addToCart(currentProduct, quantity || 1);
+      if (action === 'add' && selectedProduct) {
+        addToCart(selectedProduct, quantity || 1);
       } else if (action === 'remove' && productId) {
         removeFromCart(productId);
       } else if (action === 'clear') {
@@ -64,247 +105,233 @@ export default function Home() {
       }
     };
 
-    window.addEventListener(CLIENT_TOOL_EVENTS.CART_UPDATE, handleCartUpdate);
-    return () => window.removeEventListener(CLIENT_TOOL_EVENTS.CART_UPDATE, handleCartUpdate);
-  }, [currentProduct, addToCart, removeFromCart, clearCart]);
-
-  /**
-   * Listen for product navigation events from voice commands
-   */
-  useEffect(() => {
-    const handleProductNavigate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { direction } = customEvent.detail;
-
-      if (direction === 'next') {
-        nextProduct();
-      } else if (direction === 'previous') {
-        previousProduct();
+    // Handle read product details - show the product card
+    const handleReadProduct = (event: Event) => {
+      const customEvent = event as CustomEvent<{ productId: number }>;
+      const { productId } = customEvent.detail;
+      
+      console.log('[Page] Voice command: Read product details', productId);
+      
+      // If productId is 0, use first product from filtered list
+      if (productId === 0 && filteredProducts.length > 0) {
+        const currentProduct = filteredProducts[0];
+        setSelectedProduct(currentProduct);
+        setHasInteracted(true);
+      } else {
+        // Find product by ID
+        const product = filteredProducts.find(p => p.id === productId);
+        if (product) {
+          setSelectedProduct(product);
+          setHasInteracted(true);
+        }
       }
     };
 
+    // Handle close product - close the product detail card
+    const handleCloseProduct = () => {
+      console.log('[Page] Voice command: Close product');
+      setSelectedProduct(null);
+    };
+
+    // Handle open cart - open the cart overlay
+    const handleOpenCart = () => {
+      console.log('[Page] Voice command: Open cart');
+      setShowCart(true);
+    };
+
     window.addEventListener(CLIENT_TOOL_EVENTS.PRODUCT_NAVIGATE, handleProductNavigate);
-    return () => window.removeEventListener(CLIENT_TOOL_EVENTS.PRODUCT_NAVIGATE, handleProductNavigate);
-  }, [nextProduct, previousProduct]);
+    window.addEventListener(CLIENT_TOOL_EVENTS.CATEGORY_FILTER, handleCategoryFilter);
+    window.addEventListener(CLIENT_TOOL_EVENTS.CART_UPDATE, handleCartUpdate);
+    window.addEventListener(CLIENT_TOOL_EVENTS.READ_PRODUCT, handleReadProduct);
+    window.addEventListener(CLIENT_TOOL_EVENTS.CLOSE_PRODUCT, handleCloseProduct);
+    window.addEventListener(CLIENT_TOOL_EVENTS.OPEN_CART, handleOpenCart);
+
+    return () => {
+      window.removeEventListener(CLIENT_TOOL_EVENTS.PRODUCT_NAVIGATE, handleProductNavigate);
+      window.removeEventListener(CLIENT_TOOL_EVENTS.CATEGORY_FILTER, handleCategoryFilter);
+      window.removeEventListener(CLIENT_TOOL_EVENTS.CART_UPDATE, handleCartUpdate);
+      window.removeEventListener(CLIENT_TOOL_EVENTS.READ_PRODUCT, handleReadProduct);
+      window.removeEventListener(CLIENT_TOOL_EVENTS.CLOSE_PRODUCT, handleCloseProduct);
+      window.removeEventListener(CLIENT_TOOL_EVENTS.OPEN_CART, handleOpenCart);
+    };
+  }, [selectedProduct, filteredProducts, nextProduct, previousProduct, setCategory, addToCart, removeFromCart, clearCart]);
+
+  const handleProductClick = (product: Product) => {
+    setSelectedProduct(product);
+    setHasInteracted(true);
+  };
+
+  const handleNextProduct = () => {
+    if (!selectedProduct) return;
+    const currentIndex = filteredProducts.findIndex(p => p.id === selectedProduct.id);
+    if (currentIndex < filteredProducts.length - 1) {
+      setSelectedProduct(filteredProducts[currentIndex + 1]);
+    }
+  };
+
+  const handlePreviousProduct = () => {
+    if (!selectedProduct) return;
+    const currentIndex = filteredProducts.findIndex(p => p.id === selectedProduct.id);
+    if (currentIndex > 0) {
+      setSelectedProduct(filteredProducts[currentIndex - 1]);
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (selectedProduct) {
+      addToCart(selectedProduct, 1);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-black">
+        <div className="text-white text-xl">Loading products...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-black">
+        <div className="text-red-500 text-xl">Error: {error}</div>
+      </div>
+    );
+  }
+
+  const currentIndex = selectedProduct ? filteredProducts.findIndex(p => p.id === selectedProduct.id) : -1;
+  const hasNext = currentIndex < filteredProducts.length - 1;
+  const hasPrevious = currentIndex > 0;
 
   return (
-    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      {/* Header */}
-      <header className="border-b border-[var(--card-border)] bg-[var(--card-bg)]/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold gradient-text">Jarvis Shopping Assistant</h1>
-              <p className="text-sm text-[var(--foreground-muted)]">Voice-Controlled Shopping Experience</p>
-            </div>
-            
-            {/* Cart Button */}
-            <button
-              onClick={() => setShowCart(!showCart)}
-              className="relative flex items-center gap-2 px-4 py-2 bg-[var(--card-bg)] border-2 border-[var(--card-border)] rounded-lg hover:border-[var(--primary)] transition-all"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              <span className="font-semibold">Cart</span>
-              {itemCount > 0 && (
-                <span className="absolute -top-2 -right-2 w-6 h-6 bg-[var(--accent)] text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {itemCount}
-                </span>
-              )}
-            </button>
-          </div>
+    <div className="h-screen w-screen overflow-hidden flex">
+      {/* Left Side - Voice AI */}
+      <div className="w-1/2 h-full bg-black flex flex-col items-center justify-center relative">
+        <div className="absolute top-8 left-8 z-20">
+          <h1 className="text-2xl font-bold holographic-text">{t('app.title')}</h1>
+          <p className="text-sm text-gray-400 mt-1">{t('app.subtitle')}</p>
         </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Voice Assistant */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-24">
-              <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-6">
-                <h2 className="text-xl font-semibold mb-6 text-center">Voice Control</h2>
-                <VoiceAssistant showDebugMessages={false} />
-                
-                <div className="mt-8 p-4 bg-[var(--background)] rounded-lg">
-                  <h3 className="text-sm font-semibold mb-2 text-[var(--primary)]">Voice Commands:</h3>
-                  <ul className="text-xs text-[var(--foreground-muted)] space-y-1">
-                    <li>• &quot;Next product&quot; / &quot;Previous&quot;</li>
-                    <li>• &quot;Show me electronics&quot;</li>
-                    <li>• &quot;Add to cart&quot;</li>
-                    <li>• &quot;What&apos;s in my cart?&quot;</li>
-                    <li>• &quot;Clear cart&quot;</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Middle Column - Product Display */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Category Filter */}
-            <CategoryFilter
-              activeCategory={activeCategory}
-              onCategoryChange={setCategory}
-            />
-
-            {/* Product Display */}
-            {isLoading && (
-              <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-[var(--error)]/10 border border-[var(--error)] rounded-lg p-6 text-center">
-                <p className="text-[var(--error)]">{error}</p>
-              </div>
-            )}
-
-            {!isLoading && !error && currentProduct && (
-              <div className="space-y-4">
-                {/* Navigation Info */}
-                <div className="text-center text-sm text-[var(--foreground-muted)]">
-                  Product {currentProductIndex + 1} of {filteredProducts.length}
-                </div>
-
-                {/* Product Card */}
-                <ProductCard product={currentProduct} />
-
-                {/* Navigation Buttons */}
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={previousProduct}
-                    className="flex items-center gap-2 px-6 py-3 bg-[var(--card-bg)] border-2 border-[var(--card-border)] rounded-lg hover:border-[var(--primary)] hover:bg-[var(--card-bg-hover)] transition-all"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                    <span>Previous</span>
-                  </button>
-
-                  <button
-                    onClick={() => addToCart(currentProduct, 1)}
-                    className="px-8 py-3 bg-[var(--primary)] text-white font-semibold rounded-lg hover:bg-[var(--primary-dark)] transition-all shadow-lg hover:shadow-xl"
-                  >
-                    Add to Cart
-                  </button>
-
-                  <button
-                    onClick={nextProduct}
-                    className="flex items-center gap-2 px-6 py-3 bg-[var(--card-bg)] border-2 border-[var(--card-border)] rounded-lg hover:border-[var(--primary)] hover:bg-[var(--card-bg-hover)] transition-all"
-                  >
-                    <span>Next</span>
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Product Description */}
-                <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg p-6">
-                  <h3 className="text-lg font-semibold mb-3">Description</h3>
-                  <p className="text-[var(--foreground-muted)] leading-relaxed">
-                    {currentProduct.description}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {!isLoading && !error && filteredProducts.length === 0 && (
-              <div className="text-center py-20">
-                <p className="text-[var(--foreground-muted)]">No products found in this category.</p>
-              </div>
-            )}
-          </div>
-        </div>
+        
+        <VoiceAssistant 
+          showDebugMessages={true}
+          currentProducts={filteredProducts}
+          selectedProduct={selectedProduct}
+          activeCategory={activeCategory}
+          cartItems={cart.items}
+          cartSubtotal={cart.subtotal}
+        />
       </div>
 
-      {/* Shopping Cart Sidebar */}
-      {showCart && (
-        <div className="fixed inset-0 z-50 flex items-start justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowCart(false)}
-          />
+      {/* Right Side - Product Marketplace */}
+      <div className="w-1/2 h-full bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col relative">
+        {/* Subtle grid overlay */}
+        <div className="absolute inset-0 opacity-5 pointer-events-none">
+          <div className="w-full h-full" style={{
+            backgroundImage: `
+              linear-gradient(rgba(6, 182, 212, 0.5) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(6, 182, 212, 0.5) 1px, transparent 1px)
+            `,
+            backgroundSize: '30px 30px'
+          }} />
+        </div>
 
-          {/* Cart Panel */}
-          <div className="relative w-full max-w-md h-full bg-[var(--card-bg)] border-l border-[var(--card-border)] shadow-2xl overflow-y-auto animate-slide-in-right">
-            <div className="p-6">
-              {/* Cart Header */}
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Shopping Cart</h2>
-                <button
-                  onClick={() => setShowCart(false)}
-                  className="text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-                >
-                  ✕
-                </button>
+        {/* Header */}
+        <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-cyan-500/20 bg-black/50 backdrop-blur-sm">
+          <LanguageSwitcher />
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+            onClick={() => setShowCart(!showCart)}
+          >
+            <ShoppingCart size={24} />
+            {itemCount > 0 && (
+              <Badge className="absolute -top-1 -right-1 bg-cyan-500 text-white px-2 animate-pulse">
+                {itemCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
+        {!hasInteracted ? (
+          /* Empty State - Before Interaction */
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-8">
+            <div className="text-center space-y-6 max-w-md">
+              {/* Animated Icon */}
+              <div className="relative mx-auto w-32 h-32">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-full blur-2xl animate-pulse-slow" />
+                <div className="relative w-full h-full rounded-full border-2 border-cyan-500/30 flex items-center justify-center bg-gradient-to-br from-gray-900 to-black animate-glow">
+                  <ShoppingCart size={48} className="text-cyan-400" />
+                </div>
               </div>
 
-              {/* Cart Items */}
-              {cart.items.length === 0 ? (
-                <div className="text-center py-12">
-                  <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-[var(--foreground-muted)]" />
-                  <p className="text-[var(--foreground-muted)]">Your cart is empty</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {cart.items.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="flex gap-4 p-4 bg-[var(--background)] rounded-lg border border-[var(--card-border)]"
-                    >
-                      <img
-                        src={item.product.image}
-                        alt={item.product.title}
-                        className="w-20 h-20 object-contain bg-white/5 rounded"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm line-clamp-2 mb-1">
-                          {item.product.title}
-                        </h3>
-                        <p className="text-[var(--accent)] font-bold">
-                          ${item.product.price.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-[var(--foreground-muted)]">
-                          Quantity: {item.quantity}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(item.product.id)}
-                        className="text-[var(--error)] hover:text-red-400"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
+              {/* Message */}
+              <div className="space-y-3">
+                <h2 className="text-2xl font-bold holographic-text">
+                  {t('app.title')}
+                </h2>
+                <p className="text-lg text-gray-300">
+                  Start talking to the AI assistant
+                </p>
+                <p className="text-sm text-cyan-400/70">
+                  Say &quot;Show me electronics&quot; or click a category below
+                </p>
+              </div>
 
-                  {/* Cart Summary */}
-                  <div className="border-t border-[var(--card-border)] pt-4 mt-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[var(--foreground-muted)]">Subtotal:</span>
-                      <span className="text-2xl font-bold text-[var(--accent)]">
-                        ${cart.subtotal.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm text-[var(--foreground-muted)] mb-4">
-                      <span>Items:</span>
-                      <span>{itemCount}</span>
-                    </div>
+              {/* Decorative elements */}
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse delay-100" style={{ animationDelay: '0.2s' }} />
+                <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse delay-200" style={{ animationDelay: '0.4s' }} />
+              </div>
+            </div>
 
-                    <button
-                      onClick={clearCart}
-                      className="w-full px-4 py-2 bg-[var(--error)]/20 text-[var(--error)] border border-[var(--error)] rounded-lg hover:bg-[var(--error)]/30 transition-all mb-3"
-                    >
-                      Clear Cart
-                    </button>
-
-                    <button className="w-full px-4 py-3 bg-[var(--primary)] text-white font-semibold rounded-lg hover:bg-[var(--primary-dark)] transition-all shadow-lg">
-                      Proceed to Checkout
-                    </button>
-                  </div>
-                </div>
-              )}
+            {/* Category Tabs at Bottom */}
+            <div className="absolute bottom-8 left-0 right-0 px-6">
+              <CategoryTabs
+                activeCategory={activeCategory}
+                onCategoryChange={(cat) => {
+                  setCategory(cat);
+                  setHasInteracted(true);
+                }}
+              />
             </div>
           </div>
-        </div>
+        ) : (
+          /* Product View - After Interaction */
+          <>
+            {/* Category Tabs */}
+            <div className="relative z-10 px-6 py-4 border-b border-cyan-500/20 bg-black/30 backdrop-blur-sm">
+              <CategoryTabs
+                activeCategory={activeCategory}
+                onCategoryChange={setCategory}
+              />
+            </div>
+
+            {/* Product Grid */}
+            <div className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
+              <ProductGrid
+                products={filteredProducts}
+                onProductClick={handleProductClick}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Product Detail Modal */}
+      {selectedProduct && (
+        <ProductDetail
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onNext={handleNextProduct}
+          onPrevious={handlePreviousProduct}
+          onAddToCart={handleAddToCart}
+          hasNext={hasNext}
+          hasPrevious={hasPrevious}
+        />
       )}
-    </main>
+    </div>
   );
 }

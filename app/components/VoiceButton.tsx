@@ -12,11 +12,12 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
-import { startCall, endCall } from '@/lib/voiceFunctions';
-import { JARVIS_CONFIG } from '@/app/jarvis-config';
-import { VoiceStatus } from '@/lib/types';
+import { startCall, endCall, addStatusListener, getSessionStatus, isSessionActive } from '@/lib/voiceFunctions';
+import { KALDI_CONFIG } from '@/app/jarvis-config';
+import { VoiceStatus, Product, ProductCategory, CartItem } from '@/lib/types';
+import { useProductContext } from '@/lib/useProductContext';
 
 interface VoiceButtonProps {
   /** Current voice session status */
@@ -27,6 +28,16 @@ interface VoiceButtonProps {
   showDebugMessages?: boolean;
   /** Custom class name for styling */
   className?: string;
+  /** Current products being displayed */
+  currentProducts?: Product[];
+  /** Currently selected product */
+  selectedProduct?: Product | null;
+  /** Active category filter */
+  activeCategory?: ProductCategory | 'all';
+  /** Cart items */
+  cartItems?: CartItem[];
+  /** Cart subtotal */
+  cartSubtotal?: number;
 }
 
 /**
@@ -39,12 +50,25 @@ interface VoiceButtonProps {
 export default function VoiceButton({
   status = 'idle',
   onStatusChange,
-  showDebugMessages = false,
   className = '',
+  currentProducts = [],
+  selectedProduct = null,
+  activeCategory = 'all',
+  cartItems = [],
+  cartSubtotal = 0,
 }: VoiceButtonProps) {
   const [localStatus, setLocalStatus] = useState<VoiceStatus>(status);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState(false);
+
+  // Get dynamic system prompt with product context
+  const { systemPrompt } = useProductContext({
+    currentProducts,
+    selectedProduct,
+    activeCategory,
+    cartItems,
+    cartSubtotal,
+  });
 
   // Sync local status with prop
   useEffect(() => {
@@ -54,15 +78,77 @@ export default function VoiceButton({
   /**
    * Update status and notify parent component
    */
-  const updateStatus = (newStatus: VoiceStatus) => {
+  const updateStatus = useCallback((newStatus: VoiceStatus) => {
     setLocalStatus(newStatus);
     onStatusChange?.(newStatus);
-  };
+  }, [onStatusChange]);
+
+  /**
+   * Monitor Ultravox session status changes
+   */
+  useEffect(() => {
+    // Poll for status changes every 300ms for more responsive updates
+    const statusInterval = setInterval(() => {
+      const sessionActive = isSessionActive();
+      
+      if (!sessionActive && (localStatus === 'listening' || localStatus === 'speaking')) {
+        // Session ended but UI still shows active - reset to idle
+        console.log('[VoiceButton] Session inactive but UI shows active, resetting to idle');
+        updateStatus('idle');
+        return;
+      }
+      
+      if (sessionActive) {
+        const currentStatus = getSessionStatus();
+        
+        if (currentStatus) {
+          // Map Ultravox status to our VoiceStatus
+          let newStatus: VoiceStatus | null = null;
+          
+          if (currentStatus === 'listening' && localStatus !== 'listening') {
+            newStatus = 'listening';
+          } else if (currentStatus === 'speaking' && localStatus !== 'speaking') {
+            newStatus = 'speaking';
+          } else if ((currentStatus === 'idle' || currentStatus === 'disconnected') && 
+                     (localStatus === 'listening' || localStatus === 'speaking')) {
+            newStatus = 'idle';
+          }
+          
+          if (newStatus) {
+            console.log('[VoiceButton] Status changed from', localStatus, 'to', newStatus);
+            updateStatus(newStatus);
+          }
+        }
+      }
+    }, 300); // Check every 300ms for responsive updates
+
+    // Also set up event listener for immediate updates
+    const cleanup = addStatusListener?.((status: string) => {
+      console.log('[VoiceButton] Status event received:', status);
+      
+      if (status === 'listening') {
+        updateStatus('listening');
+      } else if (status === 'speaking') {
+        updateStatus('speaking');
+      } else if (status === 'idle' || status === 'disconnected') {
+        if (localStatus === 'listening' || localStatus === 'speaking') {
+          updateStatus('idle');
+        }
+      }
+    });
+
+    return () => {
+      clearInterval(statusInterval);
+      if (cleanup) cleanup();
+    };
+  }, [localStatus, updateStatus]);
 
   /**
    * Check and request microphone permissions
    * Requirement 10.3: Handle microphone permission requests
+   * Note: Currently not used as Ultravox handles permissions internally
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const checkMicrophonePermission = async (): Promise<boolean> => {
     try {
       // Check if browser supports getUserMedia
@@ -118,10 +204,17 @@ export default function VoiceButton({
 
       // Start the voice call (this will handle mic permissions internally)
       console.log('[VoiceButton] Starting voice call with config:', {
-        model: JARVIS_CONFIG.model,
-        voice: JARVIS_CONFIG.voice,
-        toolCount: JARVIS_CONFIG.selectedTools?.length || 0,
+        model: KALDI_CONFIG.model,
+        voice: KALDI_CONFIG.voice,
+        toolCount: KALDI_CONFIG.selectedTools?.length || 0,
+        systemPromptLength: systemPrompt.length,
       });
+      
+      // Create config with dynamic system prompt
+      const callConfig = {
+        ...KALDI_CONFIG,
+        systemPrompt,
+      };
       
       await startCall(
         {
@@ -132,7 +225,7 @@ export default function VoiceButton({
             }
           },
         },
-        JARVIS_CONFIG,
+        callConfig,
         true // Enable debug messages
       );
 
@@ -200,24 +293,26 @@ export default function VoiceButton({
    * Determine button appearance based on status
    */
   const getButtonStyles = () => {
-    const baseStyles = 'relative flex items-center justify-center w-16 h-16 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--background)]';
+    const baseStyles = 'relative flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 focus:outline-none';
     
     switch (localStatus) {
       case 'idle':
-        return `${baseStyles} bg-[var(--card-bg)] border-2 border-[var(--card-border)] hover:border-[var(--primary)] hover:bg-[var(--card-bg-hover)] focus:ring-[var(--primary)]`;
+        return `${baseStyles} bg-gray-800 border-2 border-gray-700 hover:border-cyan-500 hover:bg-gray-700`;
       
       case 'connecting':
-        return `${baseStyles} bg-[var(--card-bg)] border-2 border-[var(--primary)] cursor-wait focus:ring-[var(--primary)]`;
+        return `${baseStyles} bg-gradient-to-br from-cyan-500 to-blue-600 border-2 border-cyan-400 cursor-wait animate-pulse`;
       
       case 'listening':
+        return `${baseStyles} bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 border-2 border-cyan-300 shadow-lg shadow-cyan-500/50 animate-pulse-glow`;
+      
       case 'speaking':
-        return `${baseStyles} bg-[var(--primary)] border-2 border-[var(--primary-light)] hover:bg-[var(--primary-dark)] animate-pulse-glow focus:ring-[var(--primary-light)]`;
+        return `${baseStyles} bg-gradient-to-br from-purple-500 via-pink-500 to-cyan-500 border-2 border-purple-300 shadow-lg shadow-purple-500/50 animate-pulse-glow`;
       
       case 'error':
-        return `${baseStyles} bg-[var(--error)] border-2 border-red-600 hover:bg-red-600 focus:ring-red-500`;
+        return `${baseStyles} bg-gradient-to-br from-red-500 to-red-700 border-2 border-red-400`;
       
       default:
-        return `${baseStyles} bg-[var(--card-bg)] border-2 border-[var(--card-border)]`;
+        return `${baseStyles} bg-gray-800 border-2 border-gray-700`;
     }
   };
 
@@ -225,8 +320,8 @@ export default function VoiceButton({
    * Get icon based on status
    */
   const getIcon = () => {
-    const iconSize = 24;
-    const iconColor = localStatus === 'idle' ? 'var(--foreground-muted)' : 'white';
+    const iconSize = 28;
+    const iconColor = 'white';
     
     switch (localStatus) {
       case 'connecting':
@@ -237,11 +332,11 @@ export default function VoiceButton({
         return <Mic size={iconSize} color={iconColor} />;
       
       case 'error':
-        return <MicOff size={iconSize} color="white" />;
+        return <MicOff size={iconSize} color={iconColor} />;
       
       case 'idle':
       default:
-        return <Mic size={iconSize} color={iconColor} />;
+        return <Mic size={iconSize} color="rgb(156, 163, 175)" />;
     }
   };
 
@@ -266,7 +361,7 @@ export default function VoiceButton({
   };
 
   return (
-    <div className={`flex flex-col items-center gap-2 ${className}`}>
+    <div className={`flex flex-col items-center gap-3 ${className}`}>
       <button
         onClick={handleClick}
         disabled={localStatus === 'connecting' || isActivating}
@@ -277,11 +372,6 @@ export default function VoiceButton({
       >
         {getIcon()}
       </button>
-      
-      {/* Status text */}
-      <span className="text-xs text-[var(--foreground-muted)] capitalize">
-        {localStatus}
-      </span>
       
       {/* Permission error message */}
       {permissionError && (

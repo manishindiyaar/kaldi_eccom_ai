@@ -11,6 +11,11 @@
 export type ProductCategory = 'electronics' | 'jewelery' | "men's clothing" | "women's clothing";
 
 /**
+ * Product tag types for trending/bestseller indicators
+ */
+export type ProductTag = 'HOT' | 'BESTSELLER' | null;
+
+/**
  * Product data structure from Fake Store API
  * Requirement 2.5: Product data parsing with all required fields
  */
@@ -25,6 +30,24 @@ export interface Product {
     rate: number;
     count: number;
   };
+}
+
+/**
+ * Determine product tag based on rating and review count
+ * - BESTSELLER: 4.5+ rating with 200+ reviews
+ * - HOT: 4.0+ rating with 150+ reviews
+ * - null: Below thresholds
+ */
+export function getProductTag(product: Product): ProductTag {
+  const { rate, count } = product.rating;
+  
+  if (rate >= 4.5 && count >= 200) {
+    return 'BESTSELLER';
+  } else if (rate >= 4.0 && count >= 150) {
+    return 'HOT';
+  }
+  
+  return null;
 }
 
 /**

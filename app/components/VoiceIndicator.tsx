@@ -1,13 +1,8 @@
 /**
  * VoiceIndicator Component
  * 
- * Displays visual indicator for voice session states (idle/listening/speaking)
- * with animated effects for premium user experience.
- * 
- * Requirements:
- * - 1.2: Display visual indicator showing listening state
- * - 7.2: Animated visual indicator while listening (pulsing orb)
- * - 7.3: Different animated indicator while speaking (waveform)
+ * Beautiful gradient animation for voice AI status
+ * Inspired by modern voice assistant UIs
  */
 
 'use client';
@@ -20,73 +15,57 @@ interface VoiceIndicatorProps {
 }
 
 export default function VoiceIndicator({ status, className = '' }: VoiceIndicatorProps) {
-  // Idle state - no indicator
-  if (status === 'idle') {
-    return null;
-  }
-
-  // Error state - red pulsing indicator
-  if (status === 'error') {
-    return (
-      <div className={`flex items-center justify-center ${className}`}>
-        <div className="relative flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500 animate-pulse-glow" />
-          <div className="absolute w-8 h-8 rounded-full bg-red-500" />
+  const isActive = status === 'listening' || status === 'speaking';
+  
+  return (
+    <div className={`relative flex items-center justify-center ${className}`}>
+      {/* Gradient Background Blur */}
+      {isActive && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-96 h-96 bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 rounded-full blur-3xl opacity-40 animate-pulse-slow" />
         </div>
+      )}
+      
+      {/* Animated Rings */}
+      {isActive && (
+        <>
+          <div className="absolute w-64 h-64 rounded-full border-2 border-cyan-400 opacity-20 animate-ping-slow" />
+          <div className="absolute w-80 h-80 rounded-full border border-blue-400 opacity-10 animate-ping-slower" />
+        </>
+      )}
+      
+      {/* Center Circle */}
+      <div className="relative z-10">
+        {status === 'idle' && (
+          <div className="w-32 h-32 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center">
+            <div className="text-gray-500 text-sm">Ready</div>
+          </div>
+        )}
+        
+        {status === 'connecting' && (
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center animate-pulse">
+            <div className="text-white text-sm font-medium">Connecting...</div>
+          </div>
+        )}
+        
+        {status === 'listening' && (
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-cyan-500/50 animate-pulse-glow">
+            <div className="text-white text-sm font-medium">Listening</div>
+          </div>
+        )}
+        
+        {status === 'speaking' && (
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-cyan-500 flex items-center justify-center shadow-2xl shadow-purple-500/50 animate-pulse-glow">
+            <div className="text-white text-sm font-medium">Speaking</div>
+          </div>
+        )}
+        
+        {status === 'error' && (
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+            <div className="text-white text-sm font-medium">Error</div>
+          </div>
+        )}
       </div>
-    );
-  }
-
-  // Connecting state - simple pulsing
-  if (status === 'connecting') {
-    return (
-      <div className={`flex items-center justify-center ${className}`}>
-        <div className="relative flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-[var(--primary)]/20 border-2 border-[var(--primary)] animate-pulse" />
-          <div className="absolute w-8 h-8 rounded-full bg-[var(--primary)]" />
-        </div>
-      </div>
-    );
-  }
-
-  // Listening state - pulsing orb with glow
-  if (status === 'listening') {
-    return (
-      <div className={`flex items-center justify-center ${className}`}>
-        <div className="relative flex items-center justify-center">
-          {/* Outer ripple effect */}
-          <div className="absolute w-24 h-24 rounded-full bg-[var(--primary)]/10 animate-ripple" />
-          <div 
-            className="absolute w-24 h-24 rounded-full bg-[var(--primary)]/10 animate-ripple" 
-            style={{ animationDelay: '0.5s' }}
-          />
-          
-          {/* Main pulsing orb */}
-          <div className="w-16 h-16 rounded-full bg-[var(--primary)]/20 border-2 border-[var(--primary)] animate-pulse-glow" />
-          <div className="absolute w-8 h-8 rounded-full bg-[var(--primary)]" />
-        </div>
-      </div>
-    );
-  }
-
-  // Speaking state - waveform animation
-  if (status === 'speaking') {
-    return (
-      <div className={`flex items-center justify-center gap-1 ${className}`}>
-        {/* 5 bars with staggered wave animation */}
-        {[0, 1, 2, 3, 4].map((index) => (
-          <div
-            key={index}
-            className="w-2 h-12 bg-[var(--accent)] rounded-full animate-wave"
-            style={{
-              animationDelay: `${index * 0.1}s`,
-              height: index === 2 ? '3rem' : index === 1 || index === 3 ? '2.5rem' : '2rem',
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }

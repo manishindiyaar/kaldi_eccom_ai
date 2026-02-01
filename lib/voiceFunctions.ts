@@ -22,7 +22,9 @@ import {
   navigateProductToolImplementation,
   filterCategoryToolImplementation,
   readProductDetailsToolImplementation,
-  readCartSummaryToolImplementation
+  readCartSummaryToolImplementation,
+  closeProductToolImplementation,
+  openCartToolImplementation
 } from './clientTools';
 
 /**
@@ -150,22 +152,49 @@ export async function startCall(
       console.log('[startCall] Joining call:', joinUrl);
     }
 
-    // Initialize Ultravox Session
+    // Initialize Ultravox Session with event callbacks
     console.log('[startCall] Initializing Ultravox session...');
-    uvSession = new UltravoxSession({
-      // Event callbacks can be registered here if needed
-      // onStatusChange: callbacks.onStatusChange,
-      // onTranscriptChange: callbacks.onTranscriptChange,
-      // onDebugMessage: callbacks.onDebugMessage,
+    uvSession = new UltravoxSession();
+
+    // Set up status change listener
+    uvSession.addEventListener('status', (event) => {
+      const status = (event as CustomEvent).detail;
+      console.log('[Ultravox] Status changed:', status);
+      
+      // Map Ultravox status to our VoiceStatus
+      if (callbacks.onStatusChange) {
+        if (status === 'idle') {
+          callbacks.onStatusChange('idle');
+        } else if (status === 'listening') {
+          callbacks.onStatusChange('listening');
+        } else if (status === 'speaking') {
+          callbacks.onStatusChange('speaking');
+        } else if (status === 'disconnected') {
+          callbacks.onStatusChange('idle');
+        }
+      }
     });
 
-    // Register client tool implementations (like the working reference)
+    // Set up transcript listener for additional status tracking
+    uvSession.addEventListener('transcripts', (event) => {
+      const transcripts = (event as CustomEvent).detail;
+      if (showDebugMessages) {
+        console.log('[Ultravox] Transcripts updated:', transcripts);
+      }
+      if (callbacks.onTranscriptChange) {
+        callbacks.onTranscriptChange(transcripts);
+      }
+    });
+
+    // Register client tool implementations
     console.log('[startCall] Registering client tool implementations...');
     uvSession.registerToolImplementation('updateCart', updateCartToolImplementation);
     uvSession.registerToolImplementation('navigateProduct', navigateProductToolImplementation);
     uvSession.registerToolImplementation('filterCategory', filterCategoryToolImplementation);
     uvSession.registerToolImplementation('readProductDetails', readProductDetailsToolImplementation);
     uvSession.registerToolImplementation('readCartSummary', readCartSummaryToolImplementation);
+    uvSession.registerToolImplementation('closeProduct', closeProductToolImplementation);
+    uvSession.registerToolImplementation('openCart', openCartToolImplementation);
 
     if (showDebugMessages) {
       console.log('[startCall] Ultravox session created and tools registered');
@@ -183,7 +212,7 @@ export async function startCall(
     
     console.log('[startCall] Voice call started successfully');
 
-    // Notify callbacks of status change
+    // Initial status notification
     if (callbacks.onStatusChange) {
       callbacks.onStatusChange('listening');
     }
@@ -310,4 +339,40 @@ export function isMicMuted(): boolean {
  */
 export function isSpeakerMuted(): boolean {
   return uvSession?.isSpeakerMuted ?? false;
+}
+
+/**
+ * Get the current session status
+ * 
+ * @returns The current UltravoxSessionStatus or null if no session exists
+ */
+export function getSessionStatus(): UltravoxSessionStatus | null {
+  return uvSession?.status ?? null;
+}
+
+/**
+ * Add a status change listener to the current session
+ * 
+ * @param callback - Function to call when status changes
+ * @returns Cleanup function to remove the listener
+ */
+export function addStatusListener(callback: (status: UltravoxSessionStatus) => void): (() => void) | null {
+  if (!uvSession) {
+    console.warn('[addStatusListener] No active session');
+    return null;
+  }
+
+  const handler = (event: Event) => {
+    const status = (event as CustomEvent).detail;
+    callback(status);
+  };
+
+  uvSession.addEventListener('status', handler);
+
+  // Return cleanup function
+  return () => {
+    if (uvSession) {
+      uvSession.removeEventListener('status', handler);
+    }
+  };
 }

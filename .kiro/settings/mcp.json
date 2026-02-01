@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"],
+      "env": {},
+      "disabled": false,
+      "autoApprove": [
+        "add_component",
+        "list_components",
+        "get_registry"
+      ]
+    },
+    "reactbits": {
+      "command": "npx",
+      "args": ["-y", "@reactbits/mcp-server"],
+      "env": {},
+      "disabled": false,
+      "autoApprove": [
+        "create_component",
+        "update_component",
+        "list_components",
+        "get_component"
+      ]
+    }
+  }
+}

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { LanguageProvider } from "@/lib/languageContext";
 
 export const metadata: Metadata = {
-  title: "Jarvis Shopping Assistant",
-  description: "Voice-controlled e-commerce interface powered by Ultravox AI",
+  title: "Kaldi Shopping",
+  description: "Voice-controlled multilingual marketplace",
 };
 
 export default function RootLayout({
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased">
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

@@ -1,19 +1,12 @@
 /**
- * ProductCard Component
- * 
- * Displays a single product with image, title, price, category, and rating.
- * Features premium styling with hover effects and smooth animations.
- * 
- * Requirements:
- * - 4.3: Display product image, title, price, category, and rating
- * - 7.4: Display product images with proper aspect ratio and high quality rendering
- * - 7.6: Provide subtle visual feedback when hovering over interactive elements
+ * ProductCard Component - Sci-Fi Edition
+ * Futuristic product display with holographic effects and seller tags
  */
 
 'use client';
 
-import { Product } from '@/lib/types';
-import { Star } from 'lucide-react';
+import { Product, getProductTag } from '@/lib/types';
+import { Star, TrendingUp, Award } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -21,156 +14,123 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, className = '' }: ProductCardProps) {
-  // Format price to 2 decimal places
-  const formattedPrice = `$${product.price.toFixed(2)}`;
+  const tag = getProductTag(product);
   
-  // Format category for display (capitalize first letter of each word)
-  const formattedCategory = product.category
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-
-  // Generate star rating display
-  const renderStars = () => {
-    const fullStars = Math.floor(product.rating.rate);
-    const hasHalfStar = product.rating.rate % 1 >= 0.5;
-    const stars = [];
-
-    // Full stars
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Star
-          key={`full-${i}`}
-          className="w-4 h-4 fill-[var(--accent)] text-[var(--accent)]"
-        />
-      );
-    }
-
-    // Half star
-    if (hasHalfStar && fullStars < 5) {
-      stars.push(
-        <div key="half" className="relative w-4 h-4">
-          <Star className="w-4 h-4 text-[var(--accent)]" />
-          <div className="absolute inset-0 overflow-hidden w-1/2">
-            <Star className="w-4 h-4 fill-[var(--accent)] text-[var(--accent)]" />
-          </div>
-        </div>
-      );
-    }
-
-    // Empty stars
-    const emptyStars = 5 - Math.ceil(product.rating.rate);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(
-        <Star
-          key={`empty-${i}`}
-          className="w-4 h-4 text-gray-600"
-        />
-      );
-    }
-
-    return stars;
-  };
-
   return (
-    <div
-      className={`
-        group relative w-full max-w-2xl mx-auto
-        bg-[var(--card-bg)] border border-[var(--card-border)]
-        rounded-2xl overflow-hidden
-        transition-all duration-300 ease-in-out
-        hover:border-[var(--primary)] hover:shadow-lg hover:shadow-[var(--primary-glow)]
-        hover:scale-[1.02]
-        ${className}
-      `}
-    >
-      {/* Product Image Container */}
-      <div className="relative w-full aspect-square bg-white/5 overflow-hidden">
-        <img
-          src={product.image}
-          alt={product.title}
-          className="
-            w-full h-full object-contain p-8
-            transition-transform duration-300 ease-in-out
-            group-hover:scale-110
-          "
-        />
-        
-        {/* Category Badge */}
-        <div className="absolute top-4 left-4">
-          <span className="
-            px-3 py-1 text-xs font-semibold
-            bg-[var(--primary)]/20 text-[var(--primary)]
-            border border-[var(--primary)]/30
-            rounded-full backdrop-blur-sm
-            transition-all duration-300
-            group-hover:bg-[var(--primary)]/30 group-hover:border-[var(--primary)]
-          ">
-            {formattedCategory}
+    <div className={`relative group ${className}`}>
+      {/* Holographic Border Glow */}
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-2xl opacity-30 group-hover:opacity-50 blur transition-all duration-300" />
+      
+      {/* Main Card */}
+      <div className="relative bg-gradient-to-br from-gray-900 to-black rounded-2xl p-6 border border-cyan-500/30 backdrop-blur-sm overflow-hidden">
+        {/* Scan Lines Effect */}
+        <div className="absolute inset-0 pointer-events-none opacity-5">
+          <div className="h-full w-full" style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(6, 182, 212, 0.1) 2px, rgba(6, 182, 212, 0.1) 4px)'
+          }} />
+        </div>
+
+        {/* Top Badges Row */}
+        <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between gap-2">
+          {/* Trending Tag */}
+          {tag && (
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm font-bold text-xs uppercase tracking-wider animate-pulse ${
+              tag === 'BESTSELLER' 
+                ? 'bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border border-yellow-500/50 text-yellow-300'
+                : 'bg-gradient-to-r from-red-500/30 to-pink-500/30 border border-red-500/50 text-red-300'
+            }`}>
+              {tag === 'BESTSELLER' ? (
+                <>
+                  <Award size={14} className="animate-pulse" />
+                  <span>BESTSELLER</span>
+                </>
+              ) : (
+                <>
+                  <TrendingUp size={14} className="animate-pulse" />
+                  <span>HOT</span>
+                </>
+              )}
+            </div>
+          )}
+          
+          {/* Category Badge */}
+          <span className="px-3 py-1 bg-cyan-500/20 border border-cyan-500/50 rounded-full text-xs text-cyan-400 font-medium backdrop-blur-sm uppercase tracking-wider ml-auto">
+            {product.category}
           </span>
         </div>
 
-        {/* Hover Overlay Effect */}
-        <div className="
-          absolute inset-0 bg-gradient-to-t from-[var(--card-bg)] via-transparent to-transparent
-          opacity-0 group-hover:opacity-100
-          transition-opacity duration-300
-        " />
-      </div>
-
-      {/* Product Details */}
-      <div className="p-6 space-y-4">
-        {/* Title */}
-        <h3 className="
-          text-xl font-semibold text-[var(--foreground)]
-          line-clamp-2 min-h-[3.5rem]
-          transition-colors duration-300
-          group-hover:text-[var(--primary)]
-        ">
-          {product.title}
-        </h3>
-
-        {/* Rating */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            {renderStars()}
+        {/* Product Image with Holographic Effect */}
+        <div className="relative mb-6 mt-8 group-hover:scale-105 transition-transform duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-xl blur-xl" />
+          <div className="relative bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+            <img
+              src={product.image}
+              alt={product.title}
+              className="w-full h-64 object-contain"
+            />
           </div>
-          <span className="text-sm text-[var(--foreground-muted)]">
-            {product.rating.rate.toFixed(1)}
-          </span>
-          <span className="text-xs text-[var(--foreground-muted)]">
-            ({product.rating.count} reviews)
-          </span>
         </div>
 
-        {/* Price */}
-        <div className="flex items-baseline gap-2">
-          <span className="
-            text-3xl font-bold text-[var(--accent)]
-            transition-all duration-300
-            group-hover:text-[var(--accent-light)] group-hover:scale-105
-          ">
-            {formattedPrice}
-          </span>
+        {/* Product Info */}
+        <div className="space-y-4 relative z-10">
+          {/* Title */}
+          <h3 className="text-lg font-semibold text-white line-clamp-2 min-h-[3.5rem]">
+            {product.title}
+          </h3>
+
+          {/* Rating with Demand Indicator */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  size={14}
+                  className={
+                    i < Math.floor(product.rating.rate)
+                      ? 'fill-cyan-400 text-cyan-400'
+                      : 'text-gray-600'
+                  }
+                />
+              ))}
+            </div>
+            <span className="text-xs text-gray-400">
+              {product.rating.rate} ({product.rating.count} reviews)
+            </span>
+          </div>
+
+          {/* Demand Indicator */}
+          {tag && (
+            <div className="flex items-center gap-2 text-xs">
+              <TrendingUp size={12} className="text-green-400" />
+              <span className="text-green-400 font-medium">High Demand</span>
+              <span className="text-gray-500">•</span>
+              <span className="text-gray-400">Good selling opportunity</span>
+            </div>
+          )}
+
+          {/* Description */}
+          <p className="text-sm text-gray-400 line-clamp-3 min-h-[4.5rem]">
+            {product.description}
+          </p>
+
+          {/* Price with Glow */}
+          <div className="pt-4 border-t border-cyan-500/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500 uppercase tracking-wider">Market Price</span>
+              <div className="relative">
+                <div className="absolute inset-0 bg-cyan-500/30 blur-lg" />
+                <span className="relative text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  ₹{(product.price * 83).toFixed(0)}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Decorative Bottom Border */}
-        <div className="
-          h-1 w-0 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)]
-          rounded-full
-          transition-all duration-300 ease-out
-          group-hover:w-full
-        " />
+        {/* Corner Accents */}
+        <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-500/50 rounded-tl-2xl" />
+        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-500/50 rounded-br-2xl" />
       </div>
-
-      {/* Glow Effect on Hover */}
-      <div className="
-        absolute inset-0 rounded-2xl
-        opacity-0 group-hover:opacity-100
-        transition-opacity duration-300
-        pointer-events-none
-        bg-gradient-to-br from-[var(--primary)]/5 via-transparent to-[var(--accent)]/5
-      " />
     </div>
   );
 }

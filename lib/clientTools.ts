@@ -22,6 +22,8 @@ export const CLIENT_TOOL_EVENTS = {
   CATEGORY_FILTER: 'jarvis:category:filter',
   READ_PRODUCT: 'jarvis:product:read',
   READ_CART: 'jarvis:cart:read',
+  CLOSE_PRODUCT: 'jarvis:product:close',
+  OPEN_CART: 'jarvis:cart:open',
 } as const;
 
 /**
@@ -88,6 +90,30 @@ export function dispatchReadCart(): void {
   if (typeof window === 'undefined') return;
   
   const event = new CustomEvent(CLIENT_TOOL_EVENTS.READ_CART, {
+    detail: {},
+  });
+  window.dispatchEvent(event);
+}
+
+/**
+ * Dispatch a custom event to close product detail view
+ */
+export function dispatchCloseProduct(): void {
+  if (typeof window === 'undefined') return;
+  
+  const event = new CustomEvent(CLIENT_TOOL_EVENTS.CLOSE_PRODUCT, {
+    detail: {},
+  });
+  window.dispatchEvent(event);
+}
+
+/**
+ * Dispatch a custom event to open cart
+ */
+export function dispatchOpenCart(): void {
+  if (typeof window === 'undefined') return;
+  
+  const event = new CustomEvent(CLIENT_TOOL_EVENTS.OPEN_CART, {
     detail: {},
   });
   window.dispatchEvent(event);
@@ -216,6 +242,32 @@ export const readCartSummaryTool: SelectedTool = {
 };
 
 /**
+ * Close Product Detail Tool Definition
+ * Allows voice assistant to close the product detail view
+ */
+export const closeProductTool: SelectedTool = {
+  temporaryTool: {
+    modelToolName: 'closeProduct',
+    description: 'Close the currently open product detail card/modal. Use this when the user says "close this", "go back", "exit", or wants to return to the product grid.',
+    dynamicParameters: [],
+    client: {},
+  },
+};
+
+/**
+ * Open Cart Tool Definition
+ * Allows voice assistant to open the shopping cart view
+ */
+export const openCartTool: SelectedTool = {
+  temporaryTool: {
+    modelToolName: 'openCart',
+    description: 'Open the shopping cart overlay to show cart contents. Use this when the user says "open cart", "show cart", "checkout", or wants to review their cart.',
+    dynamicParameters: [],
+    client: {},
+  },
+};
+
+/**
  * All client tools array for easy registration with Ultravox
  * Export this array to include all tools in the voice session configuration
  */
@@ -225,6 +277,8 @@ export const allClientTools: SelectedTool[] = [
   filterCategoryTool,
   readProductDetailsTool,
   readCartSummaryTool,
+  closeProductTool,
+  openCartTool,
 ];
 
 /**
@@ -295,4 +349,28 @@ export const readCartSummaryToolImplementation = () => {
   dispatchReadCart();
   
   return 'Reading cart summary';
+};
+
+/**
+ * Close Product Tool Implementation
+ * Handles voice commands to close product detail view
+ */
+export const closeProductToolImplementation = () => {
+  console.log('[closeProduct] Tool called');
+  
+  dispatchCloseProduct();
+  
+  return 'Closed product detail view';
+};
+
+/**
+ * Open Cart Tool Implementation
+ * Handles voice commands to open cart
+ */
+export const openCartToolImplementation = () => {
+  console.log('[openCart] Tool called');
+  
+  dispatchOpenCart();
+  
+  return 'Opened shopping cart';
 };
